@@ -10,6 +10,22 @@ A small Java 17 lab for learning heap, allocation, garbage collection (GC), rete
 - **Retention** means objects remain reachable. Long-lived reachable objects are not automatically leaks; a leak is unwanted retention.
 - JFR records JVM events. JMC opens and analyzes `.jfr` recordings. JFR allocation events are sampled/estimated, not a complete exact per-object accounting.
 
+## What is Java Flight Recorder (JFR), and why use it?
+
+**Java Flight Recorder (JFR)** is a low-overhead event recorder built into the JDK (including JDK 17). It captures diagnostic information from a *running* Java application, such as sampled object allocations, garbage collections and pauses, CPU-related events, and thread activity. It is useful when an application is slow, allocates too much memory, or pauses unexpectedly: rather than guessing which code is responsible, you can inspect recorded evidence.
+
+**JFR vs JMC:** JFR collects events and writes a `.jfr` recording; **Java Mission Control (JMC)** is the separate graphical tool used to open and analyze that file. You do **not** install JFR separately when using a full JDK 17, but you **do** install JMC separately. The `jcmd` utility starts and stops JFR for an already-running Java process.
+
+### How JFR fits into this lab
+
+1. **Run the baseline:** start `AllocationPressure`. Its `createTemporaryObjects()` method repeatedly allocates short-lived buffers. This can increase allocation rate and GC work; high allocation alone is **not** a memory leak.
+2. **Record while it runs:** find the process ID with `jcmd -l`, start JFR with `jcmd <PID> JFR.start name=lab settings=profile`, wait about 60 seconds, and stop it with `jcmd <PID> JFR.stop name=lab filename=allocation.jfr`.
+3. **Inspect the evidence in JMC:** open `allocation.jfr` (File > Open File). In Memory/allocation views, inspect sampled allocation stack traces and look for `AllocationPressure.createTemporaryObjects` and `byte[]`. In Garbage Collections views, inspect GC events, pause durations, and heap behavior. Exact view names depend on the JMC version.
+4. **Compare an improvement:** run `AllocationOptimized` with the same heap settings and a similar recording duration, save `optimized.jfr`, and compare allocation activity and GC behavior. The point is to test whether the change helped under comparable conditions, not to assume every run will show identical numbers.
+5. **Investigate retained memory separately:** `RetainedObjects` keeps arrays reachable in a static list. JFR helps show *where allocations happen*, but it does not by itself prove *why objects remain reachable*. For that question, take a heap dump and inspect GC roots with a tool such as Eclipse MAT; compare with `BoundedRetention`.
+
+**What to expect:** you may see sampled allocation hotspots, GC events, pause times, and heap trends. JFR allocation events are sampled rather than an exact list of every object. A sawtooth heap graph is often normal; a leak requires evidence of unwanted retention. The exercises below provide the complete commands.
+
 ## Requirements and setup (Windows)
 
 1. Install a **JDK 17** distribution if needed. JFR, `javac`, and `jcmd` are part of a full JDK. No Maven, Spring, database, or external library is needed.
